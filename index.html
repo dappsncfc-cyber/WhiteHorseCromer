@@ -660,13 +660,20 @@
                     Experience warm Norfolk hospitality on West Street. Join us for fresh local seafood, pub classics, real cask ales, a sunny outdoor beer garden, seaside beach hampers and comfortable B&amp;B rooms.
                 </p>
 
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-                    <button type="button" onclick="openBookingModal('table')" class="w-full sm:w-auto glass-button-primary text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm shadow-lg inline-flex items-center justify-center gap-2 cursor-pointer tracking-wide uppercase">
-                        <i class="fas fa-utensils text-sm"></i> Make a Table Reservation
-                    </button>
-                    <button type="button" onclick="openBookingModal('room')" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase">
-                        <i class="fas fa-bed text-sm text-pub-sage"></i> Enquire About Rooms
-                    </button>
+                <div class="flex flex-col items-center justify-center gap-3 sm:gap-4">
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
+                        <button type="button" onclick="openBookingModal('table')" class="w-full sm:w-auto glass-button-primary text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm shadow-lg inline-flex items-center justify-center gap-2 cursor-pointer tracking-wide uppercase">
+                            <i class="fas fa-utensils text-sm"></i> Make a Table Reservation
+                        </button>
+                        <button type="button" onclick="openBookingModal('room')" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase">
+                            <i class="fas fa-bed text-sm text-pub-sage"></i> Enquire About Rooms
+                        </button>
+                    </div>
+
+                    <!-- Gift Card Button (Update href with your Square Payment Link URL) -->
+                    <a id="gift-card-link" href="https://app.squareup.com/gift/ML8VA520CZEHR/order" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto glass-pill hover:bg-white text-pub-deep border border-pub-gold/50 px-6 sm:px-8 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition inline-flex items-center justify-center gap-2 cursor-pointer uppercase shadow-sm hover:shadow-md">
+                        <i class="fas fa-gift text-sm text-pub-gold"></i> Buy a Gift Card
+                    </a>
                 </div>
             </div>
         </section>
