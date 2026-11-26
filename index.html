@@ -660,15 +660,19 @@
                     Experience warm Norfolk hospitality on West Street. Join us for fresh local seafood, pub classics, real cask ales, a sunny outdoor beer garden, seaside beach hampers and comfortable B&amp;B rooms.
                 </p>
 
-                <div class="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4">
-                    <button type="button" onclick="openBookingModal('table')" class="w-full sm:w-auto glass-button-primary text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm shadow-lg inline-flex items-center justify-center gap-2 cursor-pointer tracking-wide uppercase">
-                        <i class="fas fa-utensils text-sm"></i> Make a Table Reservation
-                    </button>
-                    <button type="button" onclick="openBookingModal('room')" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase">
-                        <i class="fas fa-bed text-sm text-pub-sage"></i> Enquire About Rooms
-                    </button>
-                    <a href="https://app.squareup.com/gift/ML8VA520CZEHR/order" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase border border-amber-500/40">
-                        <i class="fas fa-gift text-sm text-amber-600"></i> Buy a Gift Card
+                <div class="flex flex-col items-center justify-center gap-3 sm:gap-4">
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
+                        <button type="button" onclick="openBookingModal('table')" class="w-full sm:w-auto glass-button-primary text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm shadow-lg inline-flex items-center justify-center gap-2 cursor-pointer tracking-wide uppercase">
+                            <i class="fas fa-utensils text-sm"></i> Make a Table Reservation
+                        </button>
+                        <button type="button" onclick="openBookingModal('room')" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase">
+                            <i class="fas fa-bed text-sm text-pub-sage"></i> Enquire About Rooms
+                        </button>
+                    </div>
+
+                    <!-- Gift Card Button (Square Gift Card Link) -->
+                    <a id="gift-card-link" href="https://app.squareup.com/gift/ML8VA520CZEHR/order" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto glass-pill hover:bg-white text-pub-deep border border-pub-gold/50 px-6 sm:px-8 py-3.5 rounded-xl font-bold text-xs sm:text-sm transition inline-flex items-center justify-center gap-2 cursor-pointer uppercase shadow-sm hover:shadow-md">
+                        <i class="fas fa-gift text-sm text-pub-gold"></i> Buy a Gift Card
                     </a>
                 </div>
             </div>
@@ -1391,7 +1395,6 @@
         </div>
     </div>
 
-
     <!-- COOKIES POLICY GLASSMORPHIC MODAL -->
     <div id="cookies-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-2.5 sm:p-4 modal-backdrop transition-opacity duration-300">
         <div class="glass-modal-tile rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden relative shadow-2xl">
@@ -1460,7 +1463,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- FOOD CARD FULL IMAGE GLASSMORPHIC POPUP MODAL -->
     <div id="food-card-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-2.5 sm:p-4 modal-backdrop transition-opacity duration-300">
@@ -1585,6 +1587,23 @@
     <script>
         // Default Wi-Fi Password
         const DEFAULT_WIFI_PASSWORD = "CromerCrab2026!";
+
+        // Safe localStorage wrappers to prevent errors in restricted browsers/iframes
+        function safeStorageGet(key) {
+            try {
+                return window.localStorage.getItem(key);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function safeStorageSet(key, value) {
+            try {
+                window.localStorage.setItem(key, value);
+            } catch (e) {
+                // Ignore storage restrictions
+            }
+        }
 
         // Default Food Cards Data
         const defaultFoodCards = [
@@ -1819,7 +1838,7 @@
             if (!pwd || typeof pwd !== 'string') return;
             const trimmed = pwd.trim();
             if (!trimmed) return;
-            localStorage.setItem('white_horse_wifi_password', trimmed);
+            safeStorageSet('white_horse_wifi_password', trimmed);
             const codeDisplay = document.getElementById('wifi-code-display');
             if (codeDisplay) {
                 codeDisplay.textContent = trimmed;
@@ -1827,7 +1846,7 @@
         }
 
         function getCurrentWifiPassword() {
-            const stored = localStorage.getItem('white_horse_wifi_password');
+            const stored = safeStorageGet('white_horse_wifi_password');
             return (stored && stored.trim()) ? stored.trim() : DEFAULT_WIFI_PASSWORD;
         }
 
@@ -1898,21 +1917,20 @@
                             const val = doc.data();
                             if (val.menuData) {
                                 menuData = sanitizeMenuData(val.menuData);
-                                localStorage.setItem('white_horse_menu_data', JSON.stringify(menuData));
+                                safeStorageSet('white_horse_menu_data', JSON.stringify(menuData));
                             }
                             if (val.foodCards && Array.isArray(val.foodCards)) {
-                                localStorage.setItem('white_horse_food_cards', JSON.stringify(val.foodCards));
+                                safeStorageSet('white_horse_food_cards', JSON.stringify(val.foodCards));
                                 renderFoodCards();
                             }
                             if (val.events && Array.isArray(val.events)) {
                                 eventsData = cleanAndSortEvents(val.events);
-                                localStorage.setItem('white_horse_events', JSON.stringify(eventsData));
+                                safeStorageSet('white_horse_events', JSON.stringify(eventsData));
                                 renderEvents();
                             }
                             if (val.wifiPassword) {
                                 setCurrentWifiPassword(val.wifiPassword);
                             }
-                            // Re-render menu modal if currently open
                             if (activeMenuKey) {
                                 renderActiveMenuModal();
                             }
@@ -1933,7 +1951,7 @@
                         const val = snapshot.val();
                         if (val) {
                             menuData = sanitizeMenuData(val);
-                            localStorage.setItem('white_horse_menu_data', JSON.stringify(menuData));
+                            safeStorageSet('white_horse_menu_data', JSON.stringify(menuData));
                             if (activeMenuKey) {
                                 renderActiveMenuModal();
                             }
@@ -1945,7 +1963,7 @@
                     realtimeDb.ref('white_horse_food_cards').on('value', (snapshot) => {
                         const val = snapshot.val();
                         if (val) {
-                            localStorage.setItem('white_horse_food_cards', JSON.stringify(val));
+                            safeStorageSet('white_horse_food_cards', JSON.stringify(val));
                             renderFoodCards();
                         }
                     }, (err) => {
@@ -1957,7 +1975,7 @@
                         if (val) {
                             const arr = Array.isArray(val) ? val : Object.values(val);
                             eventsData = cleanAndSortEvents(arr);
-                            localStorage.setItem('white_horse_events', JSON.stringify(eventsData));
+                            safeStorageSet('white_horse_events', JSON.stringify(eventsData));
                             renderEvents();
                         }
                     }, (err) => {
@@ -2029,7 +2047,7 @@
 
         function loadEventsData() {
             try {
-                const stored = localStorage.getItem('white_horse_events');
+                const stored = safeStorageGet('white_horse_events');
                 if (stored) {
                     const parsed = JSON.parse(stored);
                     if (Array.isArray(parsed)) {
@@ -2039,7 +2057,7 @@
             } catch (e) {
                 console.error('Error loading events from localStorage:', e);
             }
-            localStorage.setItem('white_horse_events', JSON.stringify(defaultEvents));
+            safeStorageSet('white_horse_events', JSON.stringify(defaultEvents));
             return cleanAndSortEvents(defaultEvents);
         }
 
@@ -2192,7 +2210,7 @@
 
         function loadMenuData() {
             try {
-                const stored = localStorage.getItem('white_horse_menu_data');
+                const stored = safeStorageGet('white_horse_menu_data');
                 if (stored) {
                     return sanitizeMenuData(JSON.parse(stored));
                 }
@@ -2204,17 +2222,17 @@
 
         function loadFoodCards() {
             try {
-                const storedCards = localStorage.getItem('white_horse_food_cards');
+                const storedCards = safeStorageGet('white_horse_food_cards');
                 if (storedCards) {
                     const parsed = JSON.parse(storedCards);
-                    if (Array.isArray(parsed)) {
+                    if (Array.isArray(parsed) && parsed.length > 0) {
                         return parsed;
                     }
                 }
             } catch (e) {
                 console.error('Error loading food cards from localStorage:', e);
             }
-            localStorage.setItem('white_horse_food_cards', JSON.stringify(defaultFoodCards));
+            safeStorageSet('white_horse_food_cards', JSON.stringify(defaultFoodCards));
             return JSON.parse(JSON.stringify(defaultFoodCards));
         }
 
@@ -2228,7 +2246,128 @@
                 return el && !el.classList.contains('hidden');
             });
         }
-// ... existing code ... -->
+
+        // Food Card Full Image Modal Handlers
+        function openFoodCardModal(image, title, tag, alt) {
+            const modal = document.getElementById('food-card-modal');
+            const imgEl = document.getElementById('food-modal-img');
+            const titleEl = document.getElementById('food-modal-title');
+            const tagEl = document.getElementById('food-modal-tag');
+
+            if (!modal || !imgEl || !titleEl || !tagEl) return;
+
+            imgEl.src = image || '';
+            imgEl.alt = alt || title || '';
+            titleEl.textContent = title || 'Dish';
+            tagEl.textContent = tag || 'Kitchen Special';
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFoodCardModal() {
+            const modal = document.getElementById('food-card-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
+        }
+
+        // Render Food Showcase Carousel Cards
+        function renderFoodCards() {
+            const container = document.getElementById('food-cards-container');
+            if (!container) return;
+            const cards = loadFoodCards();
+
+            if (!cards || cards.length === 0) return;
+
+            // Duplicate card set 3 times for seamless infinite forward looping
+            const renderCards = [...cards, ...cards, ...cards];
+
+            container.innerHTML = renderCards.map((card) => `
+                <div onclick="openFoodCardModal('${(card.image || '').replace(/'/g, "\\'")}', '${(card.title || '').replace(/'/g, "\\'")}', '${(card.tag || '').replace(/'/g, "\\'")}', '${(card.alt || '').replace(/'/g, "\\'")}')"
+                     class="glass-card rounded-2xl overflow-hidden p-2 group cursor-pointer shrink-0 w-[260px] sm:w-[300px] hover:scale-[1.02] transition-transform duration-300">
+                    <div class="relative h-48 sm:h-56 rounded-xl overflow-hidden">
+                        <img src="${card.image || ''}"
+                             onerror="this.onerror=null; this.src='https://placehold.co/800x600/1b3a2b/ffffff?text=${encodeURIComponent(card.title || 'Food Item')}';"
+                             alt="${card.alt || card.title || ''}"
+                             class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex items-end p-3 justify-between">
+                            <div>
+                                <span class="px-2 py-0.5 rounded-md bg-white/90 text-pub-deep text-[10px] font-bold uppercase tracking-wider mb-1 inline-block">${card.tag || ''}</span>
+                                <p class="text-white text-xs sm:text-sm font-bold drop-shadow-sm">${card.title || ''}</p>
+                            </div>
+                            <div class="w-8 h-8 rounded-full glass-pill flex items-center justify-center text-white bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <i class="fas fa-expand text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            startFoodCardAutoScroll();
+        }
+
+        function startFoodCardAutoScroll() {
+            const container = document.getElementById('food-cards-container');
+            if (!container) return;
+
+            if (foodCardAutoScrollInterval) {
+                clearInterval(foodCardAutoScrollInterval);
+            }
+
+            foodCardAutoScrollInterval = setInterval(() => {
+                if (foodCardIsHovered || isModalOpen()) return;
+
+                const cards = loadFoodCards();
+                if (!cards || cards.length === 0) return;
+
+                const firstCard = container.children[0];
+                const set2FirstCard = container.children[cards.length];
+
+                if (!firstCard || !set2FirstCard) return;
+
+                const oneSetWidth = set2FirstCard.offsetLeft - firstCard.offsetLeft;
+
+                if (oneSetWidth <= 0) return;
+
+                if (container.scrollLeft >= oneSetWidth) {
+                    container.scrollLeft -= oneSetWidth;
+                }
+
+                container.scrollBy({ left: 1.5, behavior: 'auto' });
+            }, 30);
+        }
+
+        // Wi-Fi Modal Handlers
+        function openWifiModal() {
+            const modal = document.getElementById('wifi-modal');
+            const form = document.getElementById('wifi-access-form');
+            const reveal = document.getElementById('wifi-password-reveal');
+            const codeDisplay = document.getElementById('wifi-code-display');
+
+            if (!modal) return;
+
+            if (codeDisplay) {
+                codeDisplay.textContent = getCurrentWifiPassword();
+            }
+
+            if (form) {
+                form.reset();
+                form.classList.remove('hidden');
+            }
+            if (reveal) {
+                reveal.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+
+            fetchLatestWifiPasswordFromCloud();
+        }
+
         function closeWifiModal() {
             const modal = document.getElementById('wifi-modal');
             if (!modal) return;
@@ -2240,14 +2379,21 @@
         function copyWifiPassword() {
             const pwd = getCurrentWifiPassword();
             const copyText = document.getElementById('wifi-copy-text');
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(pwd).then(() => {
-                    if (copyText) {
-                        copyText.textContent = 'Copied!';
-                        setTimeout(() => { copyText.textContent = 'Copy'; }, 2000);
-                    }
-                }).catch(() => {});
+            const tempInput = document.createElement('input');
+            tempInput.value = pwd;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            tempInput.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                if (copyText) {
+                    copyText.textContent = 'Copied!';
+                    setTimeout(() => { copyText.textContent = 'Copy'; }, 2000);
+                }
+            } catch (e) {
+                console.warn('Copy failed:', e);
             }
+            document.body.removeChild(tempInput);
         }
 
         // Open Menu Modal
@@ -2409,6 +2555,18 @@
             }
         }
 
+        // PDF Menu Download Notification Toast
+        function downloadMenuPDF(menuName) {
+            const note = document.createElement('div');
+            note.className = 'fixed bottom-5 right-5 z-50 glass-modal-tile p-4 rounded-2xl shadow-2xl border border-pub-sage/30 flex items-center gap-3 text-pub-deep text-xs font-bold animate-bounce';
+            note.innerHTML = `<i class="fas fa-file-pdf text-pub-sage text-lg"></i> Downloading ${menuName}...`;
+            document.body.appendChild(note);
+            
+            setTimeout(() => {
+                note.remove();
+            }, 3000);
+        }
+
         // Room Image Ticker / Carousel Handler
         let currentRoomSlide = 0;
         let roomTickerInterval = null;
@@ -2491,8 +2649,8 @@
             document.body.appendChild(popup);
         }
 
-        // Initialize event listeners
-        window.addEventListener('DOMContentLoaded', () => {
+        // Initialize all site components and event listeners
+        function initMainSite() {
             renderFoodCards();
             renderEvents();
             startRoomTicker();
@@ -2510,6 +2668,7 @@
 
                     if (!name || !email) return;
 
+                    const nowIso = new Date().toISOString();
                     const entry = {
                         id: 'wifi-' + Date.now(),
                         name: name,
@@ -2517,16 +2676,16 @@
                         acceptsMarketing: acceptsMarketing,
                         marketingOptIn: acceptsMarketing,
                         marketingAccepted: acceptsMarketing,
-                        submittedAt: new Date().toISOString(),
-                        createdAt: new Date().toISOString()
+                        submittedAt: nowIso,
+                        createdAt: nowIso
                     };
 
                     // Save locally immediately
                     try {
-                        const existing = JSON.parse(localStorage.getItem('white_horse_wifi_leads') || '[]');
+                        const existing = JSON.parse(safeStorageGet('white_horse_wifi_leads') || '[]');
                         const list = Array.isArray(existing) ? existing : [];
                         list.unshift(entry);
-                        localStorage.setItem('white_horse_wifi_leads', JSON.stringify(list));
+                        safeStorageSet('white_horse_wifi_leads', JSON.stringify(list));
                     } catch (err) {
                         console.warn('Error saving Wi-Fi entry locally:', err);
                     }
@@ -2542,7 +2701,7 @@
                         reveal.classList.remove('hidden');
                     }
 
-                    // Sync to Firebase in background without blocking UI
+                    // Sync to Firebase in background using entry.id so admin.html can read & delete cleanly
                     if (firestoreDb) {
                         firestoreDb.collection('wifi_leads').doc(entry.id).set(entry).catch((err) => {
                             console.warn('Error saving Wi-Fi entry to Firestore:', err);
@@ -2562,6 +2721,25 @@
                 wifiModal.addEventListener('click', (e) => {
                     if (e.target === wifiModal) {
                         closeWifiModal();
+                    }
+                });
+            }
+
+            // Food cards carousel hover & touch pause logic
+            const foodCardsContainer = document.getElementById('food-cards-container');
+            if (foodCardsContainer) {
+                foodCardsContainer.addEventListener('mouseenter', () => { foodCardIsHovered = true; });
+                foodCardsContainer.addEventListener('mouseleave', () => { foodCardIsHovered = false; });
+                foodCardsContainer.addEventListener('touchstart', () => { foodCardIsHovered = true; }, { passive: true });
+                foodCardsContainer.addEventListener('touchend', () => { foodCardIsHovered = false; });
+            }
+
+            // Food Card Full Image Modal backdrop click handler
+            const foodCardModal = document.getElementById('food-card-modal');
+            if (foodCardModal) {
+                foodCardModal.addEventListener('click', (e) => {
+                    if (e.target === foodCardModal) {
+                        closeFoodCardModal();
                     }
                 });
             }
@@ -2677,7 +2855,13 @@
                     }, 1000);
                 });
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', initMainSite);
+        } else {
+            initMainSite();
+        }
     </script>
 </body>
 </html>
