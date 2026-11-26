@@ -204,7 +204,7 @@
                 <i class="fas fa-user-shield"></i>
             </div>
             <h1 class="font-serif font-bold text-pub-deep text-2xl sm:text-3xl mb-2">Staff Portal Access</h1>
-            <p class="text-xs text-gray-600 mb-6 font-medium">Please enter the staff security PIN to manage White Horse Inn menus &amp; dishes.</p>
+            <p class="text-xs text-gray-600 mb-6 font-medium">Please enter the staff security PIN to manage White Horse Inn menus, Wi-Fi &amp; dishes.</p>
 
             <form id="admin-pin-form" class="space-y-4">
                 <div>
@@ -950,6 +950,35 @@
             }
         }
 
+        function mergeWifiLeads(incomingLeads) {
+            if (!Array.isArray(incomingLeads)) return;
+            const map = new Map();
+            wifiLeads.forEach(item => {
+                if (!item) return;
+                const ts = item.submittedAt || item.createdAt || '';
+                const key = item.id || `${item.email}-${ts}`;
+                map.set(key, {
+                    ...item,
+                    id: key,
+                    marketingOptIn: Boolean(item.marketingOptIn ?? item.acceptsMarketing ?? item.marketingAccepted),
+                    submittedAt: ts
+                });
+            });
+            incomingLeads.forEach(item => {
+                if (!item) return;
+                const ts = item.submittedAt || item.createdAt || '';
+                const key = item.id || `${item.email}-${ts}`;
+                map.set(key, {
+                    ...item,
+                    id: key,
+                    marketingOptIn: Boolean(item.marketingOptIn ?? item.acceptsMarketing ?? item.marketingAccepted),
+                    submittedAt: ts
+                });
+            });
+            wifiLeads = Array.from(map.values()).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+            localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+        }
+
         try {
             if (typeof window.firebase !== 'undefined' && firebaseConfig.apiKey) {
                 if (!window.firebase.apps.length) {
@@ -982,8 +1011,7 @@
                                 localStorage.setItem('white_horse_wifi_password', wifiPassword);
                             }
                             if (val.wifiLeads && Array.isArray(val.wifiLeads)) {
-                                wifiLeads = val.wifiLeads;
-                                localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+                                mergeWifiLeads(val.wifiLeads);
                             }
                             renderAdminEditor();
                             updateSyncStatus('connected', 'Firestore Live');
@@ -992,6 +1020,35 @@
                     }, (err) => {
                         console.warn("Firestore listener warning:", err);
                         setDiagStatus('diag-firestore-status', err.message || 'Permission Error', 'text-red-600');
+                    });
+
+                    // Dedicated listener for Wi-Fi settings document
+                    firestoreDb.collection('white_horse_portal').doc('wifi_settings').onSnapshot((doc) => {
+                        if (doc.exists && doc.data().wifiPassword) {
+                            wifiPassword = doc.data().wifiPassword;
+                            localStorage.setItem('white_horse_wifi_password', wifiPassword);
+                            if (activeAdminMenuKey === 'wifi') {
+                                renderAdminEditor();
+                            }
+                        }
+                    }, (err) => {
+                        console.warn("Firestore wifi_settings listener warning:", err);
+                    });
+
+                    // Listen to dedicated wifi_leads collection in Firestore
+                    firestoreDb.collection('wifi_leads').onSnapshot((snapshot) => {
+                        const cloudLeads = [];
+                        snapshot.forEach((doc) => {
+                            cloudLeads.push({ id: doc.id, ...doc.data() });
+                        });
+                        if (cloudLeads.length > 0) {
+                            mergeWifiLeads(cloudLeads);
+                            if (activeAdminMenuKey === 'wifi') {
+                                renderAdminEditor();
+                            }
+                        }
+                    }, (err) => {
+                        console.warn("Firestore wifi_leads collection listener warning:", err);
                     });
                 } catch (fsErr) {
                     console.warn("Firestore initialization failed:", fsErr);
@@ -1004,18 +1061,37 @@
                     console.log("Realtime Database initialised.");
                     setDiagStatus('diag-rtdb-status', 'Connected & Ready', 'text-emerald-600');
 
-                    realtimeDb.ref('white_horse_wifi_leads').on('value', (snapshot) => {
-                        const val = snapshot.val();
-                        if (val) {
-                            const arr = Array.isArray(val) ? val : Object.values(val);
-                            wifiLeads = arr;
-                            localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+                    realtimeDb.ref('white_horse_wifi_password').on('value', (snap) => {
+                        const val = snap.val();
+                        if (val && typeof val === 'string') {
+                            wifiPassword = val;
+                            localStorage.setItem('white_horse_wifi_password', wifiPassword);
                             if (activeAdminMenuKey === 'wifi') {
                                 renderAdminEditor();
                             }
                         }
-                    }, (err) => {
-                        console.warn("Realtime DB wifiLeads listener error:", err);
+                    });
+
+                    realtimeDb.ref('white_horse_wifi_leads').on('value', (snap) => {
+                        const val = snap.val();
+                        if (val) {
+                            const arr = Array.isArray(val) ? val : Object.entries(val).map(([k, v]) => ({ id: k, ...v }));
+                            mergeWifiLeads(arr);
+                            if (activeAdminMenuKey === 'wifi') {
+                                renderAdminEditor();
+                            }
+                        }
+                    });
+
+                    realtimeDb.ref('wifi_leads').on('value', (snap) => {
+                        const val = snap.val();
+                        if (val) {
+                            const arr = Array.isArray(val) ? val : Object.entries(val).map(([k, v]) => ({ id: k, ...v }));
+                            mergeWifiLeads(arr);
+                            if (activeAdminMenuKey === 'wifi') {
+                                renderAdminEditor();
+                            }
+                        }
                     });
                 } catch (rtdbErr) {
                     console.warn("Realtime DB initialization failed:", rtdbErr);
@@ -1105,6 +1181,10 @@
             if (firestoreDb) {
                 try {
                     await firestoreDb.collection('white_horse_portal').doc('data').set(payload, { merge: true });
+                    await firestoreDb.collection('white_horse_portal').doc('wifi_settings').set({
+                        wifiPassword: wifiPassword,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
                     console.log("Successfully written payload to Cloud Firestore.");
                     writtenToAny = true;
                     setDiagStatus('diag-firestore-status', 'Write Succeeded', 'text-emerald-600');
@@ -1122,7 +1202,6 @@
                     await realtimeDb.ref('white_horse_food_cards').set(foodCards);
                     await realtimeDb.ref('white_horse_events').set(eventsData);
                     await realtimeDb.ref('white_horse_wifi_password').set(wifiPassword);
-                    await realtimeDb.ref('white_horse_wifi_leads').set(wifiLeads);
                     console.log("Successfully written payload to Realtime DB.");
                     writtenToAny = true;
                     setDiagStatus('diag-rtdb-status', 'Write Succeeded', 'text-emerald-600');
@@ -1239,42 +1318,76 @@
             });
         }
 
-        function updateWifiPasswordFromAdmin(e) {
+        function saveWifiPasswordSetting(e) {
             e.preventDefault();
             const input = document.getElementById('admin-wifi-password-input');
             if (!input) return;
             const newPw = input.value.trim();
             if (!newPw) return;
             wifiPassword = newPw;
+            localStorage.setItem('white_horse_wifi_password', wifiPassword);
             saveMenuData();
             renderAdminEditor();
         }
 
-        function deleteWifiLead(leadId) {
-            if (!confirm('Are you sure you want to remove this guest entry from the list?')) return;
-            wifiLeads = wifiLeads.filter(l => l.id !== leadId);
-            saveMenuData();
-            renderAdminEditor();
+        async function deleteWifiLead(index) {
+            const lead = wifiLeads[index];
+            if (!lead) return;
+            if (confirm(`Remove "${lead.name}" (${lead.email}) from the list?`)) {
+                const leadId = lead.id;
+                wifiLeads.splice(index, 1);
+                localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+
+                if (firestoreDb && leadId) {
+                    try {
+                        await firestoreDb.collection('wifi_leads').doc(leadId).delete();
+                    } catch (e) {
+                        console.warn('Firestore wifi_leads delete warning:', e);
+                    }
+                }
+                if (realtimeDb && leadId) {
+                    try {
+                        await realtimeDb.ref('white_horse_wifi_leads/' + leadId).remove();
+                        await realtimeDb.ref('wifi_leads/' + leadId).remove();
+                    } catch (e) {
+                        console.warn('Realtime DB wifi_leads delete warning:', e);
+                    }
+                }
+
+                saveMenuData();
+                renderAdminEditor();
+            }
         }
 
-        function downloadWifiLeadsCSV() {
-            const leads = loadWifiLeads();
-            const headers = ['Name', 'Email', 'Marketing Accepted', 'Date & Time'];
-            const rows = leads.map(lead => {
-                const name = `"${(lead.name || '').replace(/"/g, '""')}"`;
-                const email = `"${(lead.email || '').replace(/"/g, '""')}"`;
-                const marketing = lead.marketingAccepted ? 'Yes' : 'No';
-                const dateFormatted = lead.createdAt ? new Date(lead.createdAt).toLocaleString('en-GB') : '';
-                return [name, email, `"${marketing}"`, `"${dateFormatted}"`].join(',');
+        function exportWifiLeadsCSV() {
+            if (!wifiLeads || wifiLeads.length === 0) {
+                const toastError = document.getElementById('admin-error-toast');
+                const toastErrorMsg = document.getElementById('admin-error-msg');
+                if (toastError && toastErrorMsg) {
+                    toastErrorMsg.textContent = 'There are no guest Wi-Fi sign-ups to export yet.';
+                    toastError.classList.remove('hidden');
+                    setTimeout(() => toastError.classList.add('hidden'), 3000);
+                }
+                return;
+            }
+
+            const headers = ['Name', 'Email', 'Marketing Opt-In', 'Date & Time'];
+            const rows = wifiLeads.map(lead => {
+                const safeName = `"${(lead.name || '').replace(/"/g, '""')}"`;
+                const safeEmail = `"${(lead.email || '').replace(/"/g, '""')}"`;
+                const optIn = lead.marketingOptIn ? 'Yes' : 'No';
+                const dateStr = lead.submittedAt ? new Date(lead.submittedAt).toLocaleString('en-GB') : '';
+                const safeDate = `"${dateStr.replace(/"/g, '""')}"`;
+                return [safeName, safeEmail, optIn, safeDate].join(',');
             });
 
-            const csvContent = [headers.join(','), ...rows].join('\n');
+            const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const todayStr = getTodayDateString();
-            link.setAttribute('href', url);
-            link.setAttribute('download', `white-horse-wifi-marketing-leads-${todayStr}.csv`);
+            const dateStamp = getTodayDateString();
+            link.href = url;
+            link.setAttribute('download', `white-horse-wifi-marketing-leads-${dateStamp}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1283,53 +1396,57 @@
 
         function renderWifiAdminEditor(container) {
             container.innerHTML = '';
-            wifiPassword = loadWifiPassword();
-            wifiLeads = loadWifiLeads();
 
-            // Section 1: Wi-Fi Password Management Card
-            const pwCard = document.createElement('div');
-            pwCard.className = 'glass-card rounded-3xl p-5 sm:p-6 border border-white/90 space-y-4';
-            pwCard.innerHTML = `
+            // 1. Wi-Fi Password Settings Card
+            const settingsCard = document.createElement('div');
+            settingsCard.className = 'glass-card rounded-3xl p-5 sm:p-6 border border-white/90 space-y-4';
+            settingsCard.innerHTML = `
                 <div class="flex items-center justify-between border-b border-emerald-900/10 pb-3">
                     <div>
-                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage"><i class="fas fa-key mr-1.5"></i> Guest Wi-Fi Password Settings</h3>
-                        <p class="text-xs text-gray-600">Update the Wi-Fi password displayed to guests on the main website after they submit their details.</p>
+                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage">Guest Wi-Fi Password Configuration</h3>
+                        <p class="text-xs text-gray-600">Update the password revealed to guests after they submit their name and email on the homepage.</p>
                     </div>
+                    <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold">
+                        <i class="fas fa-wifi mr-1"></i> Active
+                    </span>
                 </div>
-                <form onsubmit="updateWifiPasswordFromAdmin(event)" class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                <form onsubmit="saveWifiPasswordSetting(event)" class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                     <div class="flex-1">
-                        <label for="admin-wifi-password-input" class="block text-xs font-bold text-pub-deep mb-1">Current Active Wi-Fi Password *</label>
-                        <input type="text" id="admin-wifi-password-input" value="${wifiPassword.replace(/"/g, '&quot;')}" required class="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-mono font-bold text-pub-deep">
+                        <label for="admin-wifi-password-input" class="block text-xs font-bold text-pub-deep mb-1">Current Guest Wi-Fi Password</label>
+                        <input type="text" id="admin-wifi-password-input" required value="${wifiPassword.replace(/"/g, '&quot;')}" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-mono font-bold text-pub-deep">
                     </div>
-                    <button type="submit" class="glass-button-primary text-white text-xs font-bold px-5 py-3 rounded-xl uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-1.5">
-                        <i class="fas fa-save"></i> Save Wi-Fi Password
+                    <button type="submit" class="glass-button-primary text-white text-xs font-bold px-5 py-3 rounded-xl uppercase tracking-wider cursor-pointer shrink-0">
+                        <i class="fas fa-save mr-1.5"></i> Update Wi-Fi Password
                     </button>
                 </form>
             `;
-            container.appendChild(pwCard);
+            container.appendChild(settingsCard);
 
-            // Section 2: Wi-Fi Guest & Marketing Opt-In Spreadsheet List
+            // 2. Guest Wi-Fi & Marketing Sign-ups Table Card
             const leadsCard = document.createElement('div');
             leadsCard.className = 'glass-card rounded-3xl p-5 sm:p-6 border border-white/90 space-y-4';
 
-            const optedInCount = wifiLeads.filter(l => l.marketingAccepted).length;
+            const optedInCount = wifiLeads.filter(l => l.marketingOptIn).length;
 
-            let rowsHtml = wifiLeads.map(lead => {
-                const dateDisplay = lead.createdAt
-                    ? new Date(lead.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                    : '—';
-                const marketingBadge = lead.marketingAccepted
-                    ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-check-circle"></i> Yes</span>'
-                    : '<span class="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-times-circle"></i> No</span>';
+            let rowsHtml = wifiLeads.map((lead, idx) => {
+                const formattedDate = lead.submittedAt
+                    ? new Date(lead.submittedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : 'N/A';
+
+                const consentBadge = lead.marketingOptIn
+                    ? '<span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-check-circle text-emerald-600"></i> Accepted</span>'
+                    : '<span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-times-circle text-gray-400"></i> Declined</span>';
 
                 return `
-                    <tr class="border-b border-emerald-900/10 hover:bg-white/70 transition">
-                        <td class="py-3 px-4 font-bold text-pub-deep text-xs sm:text-sm">${lead.name || '—'}</td>
-                        <td class="py-3 px-4 text-xs sm:text-sm text-gray-700">${lead.email || '—'}</td>
-                        <td class="py-3 px-4">${marketingBadge}</td>
-                        <td class="py-3 px-4 text-xs text-gray-500 whitespace-nowrap">${dateDisplay}</td>
+                    <tr class="border-b border-emerald-900/10 hover:bg-white/60 transition">
+                        <td class="py-3 px-4 font-bold text-pub-deep text-xs sm:text-sm">${lead.name || ''}</td>
+                        <td class="py-3 px-4 text-xs sm:text-sm text-gray-700">
+                            <a href="mailto:${lead.email || ''}" class="text-pub-sage hover:underline font-medium">${lead.email || ''}</a>
+                        </td>
+                        <td class="py-3 px-4">${consentBadge}</td>
+                        <td class="py-3 px-4 text-xs text-gray-500 whitespace-nowrap">${formattedDate}</td>
                         <td class="py-3 px-4 text-right">
-                            <button type="button" onclick="deleteWifiLead('${lead.id}')" class="glass-pill hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer" title="Remove Entry">
+                            <button type="button" onclick="deleteWifiLead(${idx})" class="glass-pill hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer" title="Delete Entry">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </td>
@@ -1338,29 +1455,29 @@
             }).join('');
 
             leadsCard.innerHTML = `
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-emerald-900/10 pb-3 gap-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-900/10 pb-3">
                     <div>
-                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage"><i class="fas fa-users mr-1.5"></i> Guest Wi-Fi Sign-Ups &amp; Marketing List</h3>
-                        <p class="text-xs text-gray-600">Total entries: <strong>${wifiLeads.length}</strong> • Marketing Opt-ins: <strong class="text-emerald-700">${optedInCount}</strong></p>
+                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage">Guest Wi-Fi &amp; Marketing Contacts</h3>
+                        <p class="text-xs text-gray-600">Total entries: <strong>${wifiLeads.length}</strong> • Marketing opted-in: <strong class="text-emerald-700">${optedInCount}</strong></p>
                     </div>
-                    <button type="button" onclick="downloadWifiLeadsCSV()" class="glass-button-primary text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider shadow-md">
+                    <button type="button" onclick="exportWifiLeadsCSV()" class="glass-button-primary text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider shadow-md shrink-0">
                         <i class="fas fa-file-csv text-sm"></i> Download Spreadsheet (.CSV)
                     </button>
                 </div>
 
-                <div class="overflow-x-auto rounded-2xl border border-emerald-900/10 bg-white/80">
+                <div class="overflow-x-auto rounded-2xl border border-emerald-900/10 bg-white/70">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-pub-light/90 border-b border-emerald-900/10 text-[11px] font-bold uppercase tracking-wider text-pub-deep">
                                 <th class="py-3 px-4">Guest Name</th>
                                 <th class="py-3 px-4">Email Address</th>
-                                <th class="py-3 px-4">Accepted Marketing</th>
+                                <th class="py-3 px-4">Marketing Consent</th>
                                 <th class="py-3 px-4">Date &amp; Time</th>
-                                <th class="py-3 px-4 text-right">Actions</th>
+                                <th class="py-3 px-4 text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${rowsHtml || '<tr><td colspan="5" class="py-8 text-center text-xs text-gray-500">No guest Wi-Fi submissions recorded yet.</td></tr>'}
+                            ${rowsHtml || '<tr><td colspan="5" class="py-8 text-center text-xs text-gray-500">No guests have requested the Wi-Fi password yet. Entries will appear here automatically.</td></tr>'}
                         </tbody>
                     </table>
                 </div>
