@@ -657,15 +657,15 @@
                 </p>
 
                 <p class="text-sm sm:text-lg text-gray-700 max-w-2xl mx-auto mb-6 sm:mb-8 font-normal leading-relaxed">
-                    Experience warm Norfolk hospitality on West Street. Join us for fresh local seafood, pub classics, real cask ales, a sunny outdoor beer garden, seaside beach hampers and comfortable B&amp;B rooms.
-                </p>
-
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
+                <div class="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-4">
                     <button type="button" onclick="openBookingModal('table')" class="w-full sm:w-auto glass-button-primary text-white px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm shadow-lg inline-flex items-center justify-center gap-2 cursor-pointer tracking-wide uppercase">
                         <i class="fas fa-utensils text-sm"></i> Make a Table Reservation
                     </button>
                     <button type="button" onclick="openBookingModal('room')" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase">
                         <i class="fas fa-bed text-sm text-pub-sage"></i> Enquire About Rooms
+                    </button>
+                    <button type="button" onclick="openGiftCardModal()" class="w-full sm:w-auto glass-pill hover:bg-white/90 text-pub-deep px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer uppercase border border-amber-500/40">
+                        <i class="fas fa-gift text-sm text-amber-600"></i> Buy a Gift Card
                     </button>
                 </div>
             </div>
@@ -1304,6 +1304,93 @@
         </div>
     </div>
 
+    <!-- GIFT CARD GLASSMORPHIC POPUP MODAL -->
+    <div id="gift-card-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-2.5 sm:p-4 modal-backdrop transition-opacity duration-300">
+        <div class="glass-modal-tile rounded-3xl w-full max-w-lg flex flex-col overflow-hidden relative shadow-2xl border border-white/95 max-h-[92vh]">
+            <!-- Modal Header -->
+            <div class="px-5 py-4 border-b border-emerald-900/10 flex items-center justify-between bg-white/40">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                        <i class="fas fa-gift text-sm"></i>
+                    </div>
+                    <h3 class="font-serif font-bold text-pub-deep text-lg">White Horse Inn Gift Cards</h3>
+                </div>
+                <button type="button" onclick="closeGiftCardModal()" class="w-8 h-8 rounded-full glass-pill flex items-center justify-center text-gray-500 hover:text-pub-deep transition cursor-pointer" aria-label="Close Gift Card modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 sm:p-6 overflow-y-auto space-y-4">
+                <!-- Voucher Visual Preview -->
+                <div class="rounded-2xl bg-gradient-to-br from-pub-deep via-pub-sage to-pub-dark text-white p-5 shadow-lg relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-[10px] uppercase tracking-widest text-emerald-200 font-bold">Official Gift Voucher</span>
+                        <i class="fas fa-gift text-pub-gold text-lg"></i>
+                    </div>
+                    <h4 class="font-serif text-xl sm:text-2xl font-bold tracking-tight">The White Horse Inn</h4>
+                    <p class="text-[11px] text-emerald-100/90 font-serif italic">dine • drink • sleep • 24 West Street, Cromer</p>
+                    <div class="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs">
+                        <span class="text-emerald-200">Valid for Dining, Drinks &amp; B&amp;B Stays</span>
+                        <span id="gift-card-preview-amount" class="font-bold text-pub-gold text-base">£50</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Gift Card Order Form -->
+                <form id="gift-card-form" class="space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-bold text-pub-deep mb-1.5">Select Voucher Amount *</label>
+                        <div class="grid grid-cols-4 gap-2 mb-2">
+                            <button type="button" onclick="selectGiftAmount('25')" class="gift-amt-btn glass-pill py-2 rounded-xl text-xs font-bold text-pub-deep hover:bg-white transition cursor-pointer">£25</button>
+                            <button type="button" onclick="selectGiftAmount('50')" class="gift-amt-btn glass-button-primary py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer">£50</button>
+                            <button type="button" onclick="selectGiftAmount('75')" class="gift-amt-btn glass-pill py-2 rounded-xl text-xs font-bold text-pub-deep hover:bg-white transition cursor-pointer">£75</button>
+                            <button type="button" onclick="selectGiftAmount('100')" class="gift-amt-btn glass-pill py-2 rounded-xl text-xs font-bold text-pub-deep hover:bg-white transition cursor-pointer">£100</button>
+                        </div>
+                        <input type="number" id="gift-amount-input" min="10" max="1000" step="5" value="50" required placeholder="Or enter custom amount (£)" oninput="updateGiftPreviewAmount(this.value)" class="w-full px-3.5 py-2 rounded-xl glass-input text-xs sm:text-sm text-gray-800 font-semibold">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="gift-recipient-name" class="block text-xs font-bold text-pub-deep mb-1">Recipient Name *</label>
+                            <input type="text" id="gift-recipient-name" required placeholder="Who is it for?" class="w-full px-3.5 py-2 rounded-xl glass-input text-xs text-gray-800 font-medium">
+                        </div>
+                        <div>
+                            <label for="gift-buyer-name" class="block text-xs font-bold text-pub-deep mb-1">Your Name *</label>
+                            <input type="text" id="gift-buyer-name" required placeholder="Your full name" class="w-full px-3.5 py-2 rounded-xl glass-input text-xs text-gray-800 font-medium">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="gift-buyer-email" class="block text-xs font-bold text-pub-deep mb-1">Your Email Address *</label>
+                        <input type="email" id="gift-buyer-email" required placeholder="e.g. you@example.com" class="w-full px-3.5 py-2 rounded-xl glass-input text-xs text-gray-800 font-medium">
+                    </div>
+
+                    <div>
+                        <label for="gift-message" class="block text-xs font-bold text-pub-deep mb-1">Personal Message (Optional)</label>
+                        <textarea id="gift-message" rows="2" placeholder="Add a short message for the recipient..." class="w-full px-3.5 py-2 rounded-xl glass-input text-xs text-gray-800"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full glass-button-primary text-white font-bold text-xs py-3.5 rounded-xl uppercase tracking-wider cursor-pointer shadow-lg flex items-center justify-center gap-2">
+                        <i class="fas fa-gift"></i> Request Gift Card
+                    </button>
+                </form>
+
+                <!-- Step 2: Confirmation View -->
+                <div id="gift-card-confirmation" class="hidden text-center space-y-3 py-2">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-pub-sage flex items-center justify-center text-xl mx-auto shadow-inner">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h4 class="font-serif font-bold text-pub-deep text-lg">Gift Card Request Sent!</h4>
+                    <p class="text-xs text-gray-700 leading-relaxed">
+                        Thank you! Our team has received your gift card request and will email you shortly to arrange payment and digital or printed voucher delivery. For immediate assistance, call <a href="tel:01263512275" class="text-pub-sage font-bold underline">01263 512275</a>.
+                    </p>
+                    <button type="button" onclick="closeGiftCardModal()" class="w-full glass-button-primary text-white font-bold text-xs py-3 rounded-xl uppercase tracking-wider cursor-pointer">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- PRIVACY POLICY GLASSMORPHIC MODAL -->
     <div id="privacy-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-2.5 sm:p-4 modal-backdrop transition-opacity duration-300">
@@ -2220,7 +2307,7 @@
         let foodCardIsHovered = false;
 
         function isModalOpen() {
-            const modalIds = ['food-card-modal', 'menu-modal', 'privacy-modal', 'cookies-modal', 'booking-modal', 'enquiry-popup-toast', 'wifi-modal'];
+            const modalIds = ['food-card-modal', 'menu-modal', 'privacy-modal', 'cookies-modal', 'booking-modal', 'enquiry-popup-toast', 'wifi-modal', 'gift-card-modal'];
             return modalIds.some(id => {
                 const el = document.getElementById(id);
                 return el && !el.classList.contains('hidden');
@@ -2353,225 +2440,53 @@
             document.body.style.overflow = '';
         }
 
-        function copyWifiPassword() {
-            const pwd = getCurrentWifiPassword();
-            const copyText = document.getElementById('wifi-copy-text');
-            const tempInput = document.createElement('input');
-            tempInput.value = pwd;
-            document.body.appendChild(tempInput);
-            tempInput.select();
-            tempInput.setSelectionRange(0, 99999);
-            try {
-                document.execCommand('copy');
-                if (copyText) {
-                    copyText.textContent = 'Copied!';
-                    setTimeout(() => { copyText.textContent = 'Copy'; }, 2000);
-                }
-            } catch (e) {
-                console.warn('Copy failed:', e);
-            }
-            document.body.removeChild(tempInput);
-        }
-
-        // Open Menu Modal
-        function openMenuModal(menuKey) {
-            activeMenuKey = menuKey;
-            renderActiveMenuModal();
-            const modal = document.getElementById('menu-modal');
-            if (modal) {
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
-                document.body.style.overflow = 'hidden';
-            }
-        }
-
-        function renderActiveMenuModal() {
-            if (!activeMenuKey) return;
-            const titleEl = document.getElementById('menu-modal-title');
-            const contentEl = document.getElementById('menu-modal-content');
-
-            const data = menuData[activeMenuKey];
-            if (!data || !titleEl || !contentEl) return;
-
-            titleEl.textContent = data.title;
-            contentEl.innerHTML = `
-                <div class="text-center pb-4 border-b border-emerald-900/10">
-                    <img src="images/logo.jpg" onerror="this.onerror=null; this.src='https://placehold.co/100x100/1b3a2b/ffffff?text=WH';" alt="White Horse Inn Logo" class="h-24 sm:h-28 mx-auto mb-2 object-contain rounded-xl shadow-sm">
-                    <h2 class="font-serif text-2xl font-bold text-pub-deep tracking-tight">${data.title}</h2>
-                    <p class="text-xs text-pub-sage font-serif tracking-widest uppercase mt-0.5">The White Horse Inn • Cromer</p>
-                </div>
-            `;
-
-            data.sections.forEach(sec => {
-                const secDiv = document.createElement('div');
-                secDiv.className = 'border-b border-emerald-900/10 pb-4 last:border-b-0';
-
-                let itemsHtml = sec.items.map(item => `
-                    <div class="flex flex-col sm:flex-row sm:items-baseline justify-between py-2 border-b border-gray-100 last:border-b-0">
-                        <div class="pr-4">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-pub-deep text-sm">${item.name}</span>
-                                ${item.tags ? item.tags.map(t => `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-pub-sage/10 text-pub-sage">${t}</span>`).join('') : ''}
-                            </div>
-                            <p class="text-xs text-gray-600">${item.desc || ''}</p>
-                        </div>
-                        <span class="font-bold text-pub-sage text-sm whitespace-nowrap mt-1 sm:mt-0">${item.price}</span>
-                    </div>
-                `).join('');
-
-                secDiv.innerHTML = `
-                    <h4 class="font-serif font-bold text-pub-deep text-base mb-2 text-pub-sage border-b border-pub-sage/20 pb-1">${sec.category}</h4>
-                    <div class="space-y-1">${itemsHtml}</div>
-                `;
-                contentEl.appendChild(secDiv);
-            });
-        }
-
-        // Privacy Policy Modal Handlers
-        function openPrivacyModal() {
-            const modal = document.getElementById('privacy-modal');
+        // Gift Card Modal Handlers
+        function openGiftCardModal() {
+            const modal = document.getElementById('gift-card-modal');
+            const form = document.getElementById('gift-card-form');
+            const conf = document.getElementById('gift-card-confirmation');
             if (!modal) return;
+
+            if (form) {
+                form.reset();
+                form.classList.remove('hidden');
+            }
+            if (conf) {
+                conf.classList.add('hidden');
+            }
+            selectGiftAmount('50');
+
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             document.body.style.overflow = 'hidden';
         }
 
-        function closePrivacyModal() {
-            const modal = document.getElementById('privacy-modal');
+        function closeGiftCardModal() {
+            const modal = document.getElementById('gift-card-modal');
             if (!modal) return;
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             document.body.style.overflow = '';
         }
 
-        // Cookies Policy Modal Handlers
-        function openCookiesModal() {
-            const modal = document.getElementById('cookies-modal');
-            if (!modal) return;
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeCookiesModal() {
-            const modal = document.getElementById('cookies-modal');
-            if (!modal) return;
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            document.body.style.overflow = '';
-        }
-
-        // Close Menu Modal
-        function closeMenuModal() {
-            activeMenuKey = null;
-            const modal = document.getElementById('menu-modal');
-            if (!modal) return;
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            document.body.style.overflow = '';
-        }
-
-        // Toggle mobile menu drawer
-        function toggleMobileMenu() {
-            const mobileMenu = document.getElementById('mobile-menu');
-            if (mobileMenu) {
-                mobileMenu.classList.toggle('hidden');
+        function updateGiftPreviewAmount(val) {
+            const preview = document.getElementById('gift-card-preview-amount');
+            if (preview) {
+                const num = parseFloat(val);
+                preview.textContent = (!isNaN(num) && num > 0) ? `£${num}` : '£50';
             }
         }
 
-        // Open Reservation Modal with Tab Selection
-        function openBookingModal(tab = 'table') {
-            const modal = document.getElementById('booking-modal');
-            if (!modal) return;
+        function selectGiftAmount(amount) {
+            const input = document.getElementById('gift-amount-input');
+            if (input) input.value = amount;
+            updateGiftPreviewAmount(amount);
 
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            document.body.style.overflow = 'hidden';
-
-            switchModalTab(tab);
-        }
-
-        // Close Reservation Modal
-        function closeBookingModal() {
-            const modal = document.getElementById('booking-modal');
-            if (!modal) return;
-
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-            document.body.style.overflow = '';
-
-            const successMsg = document.getElementById('inquiry-success-msg');
-            if (successMsg) successMsg.classList.add('hidden');
-        }
-
-        // Switch Modal Tabs ('table' vs 'room')
-        function switchModalTab(tab) {
-            const tableContent = document.getElementById('modal-tab-table-content');
-            const roomContent = document.getElementById('modal-tab-room-content');
-            const btnTable = document.getElementById('tab-btn-table');
-            const btnRoom = document.getElementById('tab-btn-room');
-
-            if (!tableContent || !roomContent || !btnTable || !btnRoom) return;
-
-            if (tab === 'table') {
-                tableContent.classList.remove('hidden');
-                roomContent.classList.add('hidden');
-
-                btnTable.className = 'flex-1 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-bold transition cursor-pointer glass-button-primary text-white';
-                btnRoom.className = 'flex-1 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-bold transition cursor-pointer text-pub-deep hover:bg-white/60';
-            } else {
-                tableContent.classList.add('hidden');
-                roomContent.classList.remove('hidden');
-
-                btnRoom.className = 'flex-1 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-bold transition cursor-pointer glass-button-primary text-white';
-                btnTable.className = 'flex-1 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-bold transition cursor-pointer text-pub-deep hover:bg-white/60';
-
-                setTimeout(() => {
-                    window.dispatchEvent(new Event('resize'));
-                }, 50);
-            }
-        }
-
-        // PDF Menu Download Notification Toast
-        function downloadMenuPDF(menuName) {
-            const note = document.createElement('div');
-            note.className = 'fixed bottom-5 right-5 z-50 glass-modal-tile p-4 rounded-2xl shadow-2xl border border-pub-sage/30 flex items-center gap-3 text-pub-deep text-xs font-bold animate-bounce';
-            note.innerHTML = `<i class="fas fa-file-pdf text-pub-sage text-lg"></i> Downloading ${menuName}...`;
-            document.body.appendChild(note);
-            
-            setTimeout(() => {
-                note.remove();
-            }, 3000);
-        }
-
-        // Room Image Ticker / Carousel Handler
-        let currentRoomSlide = 0;
-        let roomTickerInterval = null;
-
-        function showRoomSlide(index) {
-            const slides = document.querySelectorAll('.room-slide');
-            const dots = document.querySelectorAll('.room-dot');
-            if (!slides.length) return;
-
-            if (index >= slides.length) currentRoomSlide = 0;
-            else if (index < 0) currentRoomSlide = slides.length - 1;
-            else currentRoomSlide = index;
-
-            slides.forEach((slide, i) => {
-                if (i === currentRoomSlide) {
-                    slide.classList.remove('opacity-0', 'z-0');
-                    slide.classList.add('opacity-100', 'z-10');
+            document.querySelectorAll('.gift-amt-btn').forEach(btn => {
+                if (btn.textContent.trim() === `£${amount}`) {
+                    btn.className = 'gift-amt-btn glass-button-primary py-2 rounded-xl text-xs font-bold text-white transition cursor-pointer';
                 } else {
-                    slide.classList.remove('opacity-100', 'z-10');
-                    slide.classList.add('opacity-0', 'z-0');
-                }
-            });
-
-            dots.forEach((dot, i) => {
-                if (i === currentRoomSlide) {
-                    dot.className = 'room-dot w-2.5 h-2.5 rounded-full bg-white transition-all cursor-pointer opacity-100 scale-125';
-                } else {
-                    dot.className = 'room-dot w-2.5 h-2.5 rounded-full bg-white/50 transition-all cursor-pointer hover:bg-white';
+                    btn.className = 'gift-amt-btn glass-pill py-2 rounded-xl text-xs font-bold text-pub-deep hover:bg-white transition cursor-pointer';
                 }
             });
         }
@@ -2651,7 +2566,9 @@
                         email: email,
                         acceptsMarketing: acceptsMarketing,
                         marketingOptIn: acceptsMarketing,
-                        submittedAt: new Date().toISOString()
+                        marketingAccepted: acceptsMarketing,
+                        submittedAt: new Date().toISOString(),
+                        createdAt: new Date().toISOString()
                     };
 
                     // Save locally immediately
@@ -2677,12 +2594,12 @@
 
                     // Sync to Firebase in background without blocking UI
                     if (firestoreDb) {
-                        firestoreDb.collection('wifi_leads').add(entry).catch((err) => {
+                        firestoreDb.collection('wifi_leads').doc(entry.id).set(entry).catch((err) => {
                             console.warn('Error saving Wi-Fi entry to Firestore:', err);
                         });
                     }
                     if (realtimeDb) {
-                        realtimeDb.ref('white_horse_wifi_leads').push(entry).catch((err) => {
+                        realtimeDb.ref('white_horse_wifi_leads/' + entry.id).set(entry).catch((err) => {
                             console.warn('Error saving Wi-Fi entry to Realtime DB:', err);
                         });
                     }
@@ -2699,21 +2616,38 @@
                 });
             }
 
-            // Food cards carousel hover & touch pause logic
-            const foodCardsContainer = document.getElementById('food-cards-container');
-            if (foodCardsContainer) {
-                foodCardsContainer.addEventListener('mouseenter', () => { foodCardIsHovered = true; });
-                foodCardsContainer.addEventListener('mouseleave', () => { foodCardIsHovered = false; });
-                foodCardsContainer.addEventListener('touchstart', () => { foodCardIsHovered = true; }, { passive: true });
-                foodCardsContainer.addEventListener('touchend', () => { foodCardIsHovered = false; });
+            // Gift Card Modal backdrop & form handlers
+            const giftCardModal = document.getElementById('gift-card-modal');
+            if (giftCardModal) {
+                giftCardModal.addEventListener('click', (e) => {
+                    if (e.target === giftCardModal) {
+                        closeGiftCardModal();
+                    }
+                });
             }
 
-            // Food Card Full Image Modal backdrop click handler
-            const foodCardModal = document.getElementById('food-card-modal');
-            if (foodCardModal) {
-                foodCardModal.addEventListener('click', (e) => {
-                    if (e.target === foodCardModal) {
-                        closeFoodCardModal();
+            const giftCardForm = document.getElementById('gift-card-form');
+            if (giftCardForm) {
+                giftCardForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const requestData = {
+                        amount: document.getElementById('gift-amount-input')?.value || '50',
+                        recipientName: document.getElementById('gift-recipient-name')?.value.trim() || '',
+                        buyerName: document.getElementById('gift-buyer-name')?.value.trim() || '',
+                        buyerEmail: document.getElementById('gift-buyer-email')?.value.trim() || '',
+                        message: document.getElementById('gift-message')?.value.trim() || '',
+                        createdAt: new Date().toISOString()
+                    };
+
+                    giftCardForm.classList.add('hidden');
+                    const conf = document.getElementById('gift-card-confirmation');
+                    if (conf) conf.classList.remove('hidden');
+
+                    if (firestoreDb) {
+                        firestoreDb.collection('gift_card_enquiries').add(requestData).catch(() => {});
+                    }
+                    if (realtimeDb) {
+                        realtimeDb.ref('gift_card_enquiries').push(requestData).catch(() => {});
                     }
                 });
             }
@@ -2781,6 +2715,7 @@
                     closeCookiesModal();
                     closeFoodCardModal();
                     closeWifiModal();
+                    closeGiftCardModal();
                 }
             });
 
