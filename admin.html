@@ -169,7 +169,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-20">
                 <a href="index.html" class="flex items-center gap-3 group">
-                    <img src="images/logo.jpg" alt="White Horse Inn Logo" class="h-12 w-auto object-contain rounded-xl shadow-sm group-hover:scale-105 transition">
+                    <img src="images/logo.jpg" onerror="this.onerror=null; this.src='https://placehold.co/100x100/1b3a2b/ffffff?text=WH';" alt="White Horse Inn Logo" class="h-12 w-auto object-contain rounded-xl shadow-sm group-hover:scale-105 transition">
                     <div>
                         <span class="font-serif text-xl sm:text-2xl font-bold text-pub-deep tracking-tight block leading-tight">White Horse Inn</span>
                         <span class="text-[10px] font-medium tracking-widest text-pub-sage uppercase block font-serif">Staff Admin Portal</span>
@@ -206,7 +206,7 @@
             <h1 class="font-serif font-bold text-pub-deep text-2xl sm:text-3xl mb-2">Staff Portal Access</h1>
             <p class="text-xs text-gray-600 mb-6 font-medium">Please enter the staff security PIN to manage White Horse Inn menus, Wi-Fi &amp; dishes.</p>
 
-            <form id="admin-pin-form" class="space-y-4">
+            <form id="admin-pin-form" onsubmit="handleAdminPinSubmit(event)" class="space-y-4">
                 <div>
                     <input type="password" id="admin-pin-input" maxlength="6" placeholder="Enter Staff PIN (Default: 1982)" required class="w-full text-center tracking-widest text-xl font-bold px-4 py-3.5 rounded-xl glass-input text-gray-800">
                 </div>
@@ -294,6 +294,36 @@
             </div>
         </div>
     </main>
+
+    <!-- CUSTOM DELETE CONFIRMATION MODAL (Replaces blocked browser confirm() dialogs) -->
+    <div id="delete-confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 modal-backdrop">
+        <div class="glass-modal-tile rounded-3xl w-full max-w-md flex flex-col overflow-hidden relative shadow-2xl border border-white/95">
+            <div class="px-5 py-4 border-b border-emerald-900/10 flex items-center justify-between bg-white/40">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                        <i class="fas fa-trash-alt text-sm"></i>
+                    </div>
+                    <h3 class="font-serif font-bold text-pub-deep text-lg">Confirm Deletion</h3>
+                </div>
+                <button type="button" onclick="closeDeleteConfirmModal()" class="w-8 h-8 rounded-full glass-pill flex items-center justify-center text-gray-500 hover:text-pub-deep transition cursor-pointer">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-5 sm:p-6 space-y-5">
+                <p id="delete-confirm-message" class="text-xs sm:text-sm text-gray-700 font-medium leading-relaxed">
+                    Are you sure you want to delete this item?
+                </p>
+                <div class="flex items-center justify-end gap-2.5">
+                    <button type="button" onclick="closeDeleteConfirmModal()" class="glass-pill hover:bg-white px-4 py-2.5 rounded-xl text-xs font-bold text-gray-700 cursor-pointer transition">
+                        Cancel
+                    </button>
+                    <button type="button" id="delete-confirm-btn" onclick="executePendingDelete()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-md transition">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- FIREBASE DIAGNOSTICS & SETUP MODAL -->
     <div id="diagnostics-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 modal-backdrop">
@@ -587,6 +617,23 @@
     <script>
         const DEFAULT_WIFI_PASSWORD = "CromerCrab2026!";
 
+        // Safe browser storage wrappers (prevents crashes in restricted preview iframes)
+        function safeStorageGet(key) {
+            try {
+                return window.localStorage.getItem(key);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function safeStorageSet(key, value) {
+            try {
+                window.localStorage.setItem(key, value);
+            } catch (e) {
+                // Ignore storage quota or iframe restrictions
+            }
+        }
+
         const defaultFoodCards = [
             {
                 tag: "Pub Classic",
@@ -835,24 +882,117 @@
         let eventsData = loadEventsData();
         let wifiPassword = loadWifiPassword();
         let wifiLeads = loadWifiLeads();
+        let deletedLeadIds = new Set();
+        let pendingDeleteAction = null;
         let activeAdminMenuKey = 'main';
 
+        // Custom Delete Confirmation Modal Handlers
+        function openDeleteConfirmModal(message, onConfirm) {
+            const modal = document.getElementById('delete-confirm-modal');
+            const msgEl = document.getElementById('delete-confirm-message');
+            if (!modal || !msgEl) return;
+            msgEl.textContent = message;
+            pendingDeleteAction = onConfirm;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDeleteConfirmModal() {
+            const modal = document.getElementById('delete-confirm-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            pendingDeleteAction = null;
+        }
+
+        function executePendingDelete() {
+            const action = pendingDeleteAction;
+            closeDeleteConfirmModal();
+            if (typeof action === 'function') {
+                action();
+            }
+        }
+
+        // PIN Login Handler (Bound directly on form & via JS)
+        function handleAdminPinSubmit(e) {
+            if (e) e.preventDefault();
+            const pinInput = document.getElementById('admin-pin-input');
+            const pinError = document.getElementById('admin-pin-error');
+            const authScreen = document.getElementById('admin-auth-screen');
+            const dashScreen = document.getElementById('admin-dashboard-screen');
+
+            if (pinInput && pinInput.value.trim() === '1982') {
+                if (pinError) pinError.classList.add('hidden');
+                if (authScreen) authScreen.classList.add('hidden');
+                if (dashScreen) dashScreen.classList.remove('hidden');
+                switchAdminMenuTab('main');
+            } else {
+                if (pinError) pinError.classList.remove('hidden');
+            }
+        }
+
         function loadWifiPassword() {
-            const stored = localStorage.getItem('white_horse_wifi_password');
+            const stored = safeStorageGet('white_horse_wifi_password');
             return (stored && stored.trim()) ? stored.trim() : DEFAULT_WIFI_PASSWORD;
+        }
+
+        function normalizeLead(item, fallbackKey) {
+            if (!item || typeof item !== 'object') return null;
+            const ts = item.submittedAt || item.createdAt || '';
+            const id = item.id || fallbackKey || `${item.email || 'guest'}-${ts || Date.now()}`;
+            const optIn = Boolean(item.marketingOptIn ?? item.acceptsMarketing ?? item.marketingAccepted);
+            return {
+                id: String(id),
+                name: item.name || '',
+                email: item.email || '',
+                marketingOptIn: optIn,
+                acceptsMarketing: optIn,
+                marketingAccepted: optIn,
+                submittedAt: ts,
+                createdAt: ts,
+                rtdbKey: item.rtdbKey || fallbackKey || null
+            };
         }
 
         function loadWifiLeads() {
             try {
-                const stored = localStorage.getItem('white_horse_wifi_leads');
+                const stored = safeStorageGet('white_horse_wifi_leads');
                 if (stored) {
                     const parsed = JSON.parse(stored);
-                    if (Array.isArray(parsed)) return parsed;
+                    if (Array.isArray(parsed)) {
+                        return parsed
+                            .map((item, idx) => normalizeLead(item, 'local-' + idx))
+                            .filter(item => item && !deletedLeadIds.has(item.id));
+                    }
                 }
             } catch (e) {
                 console.error('Error loading Wi-Fi leads:', e);
             }
             return [];
+        }
+
+        function mergeWifiLeads(incomingLeads) {
+            if (!Array.isArray(incomingLeads)) return;
+            const map = new Map();
+
+            wifiLeads.forEach(raw => {
+                const item = normalizeLead(raw);
+                if (item && !deletedLeadIds.has(item.id)) {
+                    map.set(item.id, item);
+                }
+            });
+
+            incomingLeads.forEach(raw => {
+                const item = normalizeLead(raw);
+                if (item && !deletedLeadIds.has(item.id)) {
+                    const existing = map.get(item.id);
+                    map.set(item.id, existing ? { ...existing, ...item, rtdbKey: item.rtdbKey || existing.rtdbKey } : item);
+                }
+            });
+
+            wifiLeads = Array.from(map.values()).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+            safeStorageSet('white_horse_wifi_leads', JSON.stringify(wifiLeads));
         }
 
         function getTodayDateString() {
@@ -916,7 +1056,7 @@
 
         function loadEventsData() {
             try {
-                const stored = localStorage.getItem('white_horse_events');
+                const stored = safeStorageGet('white_horse_events');
                 if (stored) {
                     const parsed = JSON.parse(stored);
                     if (Array.isArray(parsed)) {
@@ -926,7 +1066,7 @@
             } catch (e) {
                 console.error('Error loading events:', e);
             }
-            localStorage.setItem('white_horse_events', JSON.stringify(defaultEvents));
+            safeStorageSet('white_horse_events', JSON.stringify(defaultEvents));
             return cleanAndSortEvents(defaultEvents);
         }
 
@@ -950,65 +1090,43 @@
             }
         }
 
-        function mergeWifiLeads(incomingLeads) {
-            if (!Array.isArray(incomingLeads)) return;
-            const map = new Map();
-            wifiLeads.forEach(item => {
-                if (!item) return;
-                const ts = item.submittedAt || item.createdAt || '';
-                const key = item.id || `${item.email}-${ts}`;
-                map.set(key, {
-                    ...item,
-                    id: key,
-                    marketingOptIn: Boolean(item.marketingOptIn ?? item.acceptsMarketing ?? item.marketingAccepted),
-                    submittedAt: ts
-                });
-            });
-            incomingLeads.forEach(item => {
-                if (!item) return;
-                const ts = item.submittedAt || item.createdAt || '';
-                const key = item.id || `${item.email}-${ts}`;
-                map.set(key, {
-                    ...item,
-                    id: key,
-                    marketingOptIn: Boolean(item.marketingOptIn ?? item.acceptsMarketing ?? item.marketingAccepted),
-                    submittedAt: ts
-                });
-            });
-            wifiLeads = Array.from(map.values()).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || ''));
-            localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+        function setDiagStatus(elemId, text, className) {
+            const el = document.getElementById(elemId);
+            if (el) {
+                el.textContent = text;
+                el.className = `font-bold ${className}`;
+            }
         }
 
+        // Initialise Firebase Cloud Firestore & Realtime Database
         try {
             if (typeof window.firebase !== 'undefined' && firebaseConfig.apiKey) {
                 if (!window.firebase.apps.length) {
                     window.firebase.initializeApp(firebaseConfig);
                 }
 
-                // Initialise Firestore
+                // 1. Cloud Firestore
                 try {
                     firestoreDb = window.firebase.firestore();
-                    console.log("Cloud Firestore initialised.");
-                    
-                    // Listen to Firestore
+
                     firestoreDb.collection('white_horse_portal').doc('data').onSnapshot((doc) => {
                         if (doc.exists) {
                             const val = doc.data();
                             if (val.menuData) {
                                 menuData = sanitizeMenuData(val.menuData);
-                                localStorage.setItem('white_horse_menu_data', JSON.stringify(menuData));
+                                safeStorageSet('white_horse_menu_data', JSON.stringify(menuData));
                             }
                             if (val.foodCards && Array.isArray(val.foodCards)) {
                                 foodCards = val.foodCards;
-                                localStorage.setItem('white_horse_food_cards', JSON.stringify(foodCards));
+                                safeStorageSet('white_horse_food_cards', JSON.stringify(foodCards));
                             }
                             if (val.events && Array.isArray(val.events)) {
                                 eventsData = cleanAndSortEvents(val.events);
-                                localStorage.setItem('white_horse_events', JSON.stringify(eventsData));
+                                safeStorageSet('white_horse_events', JSON.stringify(eventsData));
                             }
                             if (val.wifiPassword) {
                                 wifiPassword = val.wifiPassword;
-                                localStorage.setItem('white_horse_wifi_password', wifiPassword);
+                                safeStorageSet('white_horse_wifi_password', wifiPassword);
                             }
                             if (val.wifiLeads && Array.isArray(val.wifiLeads)) {
                                 mergeWifiLeads(val.wifiLeads);
@@ -1022,11 +1140,11 @@
                         setDiagStatus('diag-firestore-status', err.message || 'Permission Error', 'text-red-600');
                     });
 
-                    // Dedicated listener for Wi-Fi settings document
+                    // Dedicated Wi-Fi settings doc listener
                     firestoreDb.collection('white_horse_portal').doc('wifi_settings').onSnapshot((doc) => {
                         if (doc.exists && doc.data().wifiPassword) {
                             wifiPassword = doc.data().wifiPassword;
-                            localStorage.setItem('white_horse_wifi_password', wifiPassword);
+                            safeStorageSet('white_horse_wifi_password', wifiPassword);
                             if (activeAdminMenuKey === 'wifi') {
                                 renderAdminEditor();
                             }
@@ -1035,7 +1153,7 @@
                         console.warn("Firestore wifi_settings listener warning:", err);
                     });
 
-                    // Listen to dedicated wifi_leads collection in Firestore
+                    // Dedicated wifi_leads collection listener (receives sign-ups from index.html)
                     firestoreDb.collection('wifi_leads').onSnapshot((snapshot) => {
                         const cloudLeads = [];
                         snapshot.forEach((doc) => {
@@ -1055,43 +1173,37 @@
                     setDiagStatus('diag-firestore-status', 'Failed: ' + fsErr.message, 'text-red-600');
                 }
 
-                // Initialise Realtime DB
+                // 2. Realtime Database
                 try {
                     realtimeDb = window.firebase.database();
-                    console.log("Realtime Database initialised.");
                     setDiagStatus('diag-rtdb-status', 'Connected & Ready', 'text-emerald-600');
 
                     realtimeDb.ref('white_horse_wifi_password').on('value', (snap) => {
                         const val = snap.val();
                         if (val && typeof val === 'string') {
                             wifiPassword = val;
-                            localStorage.setItem('white_horse_wifi_password', wifiPassword);
+                            safeStorageSet('white_horse_wifi_password', wifiPassword);
                             if (activeAdminMenuKey === 'wifi') {
                                 renderAdminEditor();
                             }
                         }
+                    }, (err) => {
+                        console.warn("Realtime DB wifiPassword listener error:", err);
                     });
 
-                    realtimeDb.ref('white_horse_wifi_leads').on('value', (snap) => {
-                        const val = snap.val();
+                    realtimeDb.ref('white_horse_wifi_leads').on('value', (snapshot) => {
+                        const val = snapshot.val();
                         if (val) {
-                            const arr = Array.isArray(val) ? val : Object.entries(val).map(([k, v]) => ({ id: k, ...v }));
+                            const arr = Array.isArray(val)
+                                ? val.map((v, i) => v ? { ...v, rtdbKey: String(i) } : null).filter(Boolean)
+                                : Object.entries(val).map(([k, v]) => ({ id: k, ...v, rtdbKey: k }));
                             mergeWifiLeads(arr);
                             if (activeAdminMenuKey === 'wifi') {
                                 renderAdminEditor();
                             }
                         }
-                    });
-
-                    realtimeDb.ref('wifi_leads').on('value', (snap) => {
-                        const val = snap.val();
-                        if (val) {
-                            const arr = Array.isArray(val) ? val : Object.entries(val).map(([k, v]) => ({ id: k, ...v }));
-                            mergeWifiLeads(arr);
-                            if (activeAdminMenuKey === 'wifi') {
-                                renderAdminEditor();
-                            }
-                        }
+                    }, (err) => {
+                        console.warn("Realtime DB wifiLeads listener error:", err);
                     });
                 } catch (rtdbErr) {
                     console.warn("Realtime DB initialization failed:", rtdbErr);
@@ -1105,14 +1217,6 @@
         } catch (e) {
             console.warn("Firebase general initialisation error:", e);
             updateSyncStatus('local', 'Local Storage Mode');
-        }
-
-        function setDiagStatus(elemId, text, className) {
-            const el = document.getElementById(elemId);
-            if (el) {
-                el.textContent = text;
-                el.className = `font-bold ${className}`;
-            }
         }
 
         function openDiagnosticsModal() {
@@ -1133,7 +1237,7 @@
 
         function loadMenuData() {
             try {
-                const stored = localStorage.getItem('white_horse_menu_data');
+                const stored = safeStorageGet('white_horse_menu_data');
                 if (stored) {
                     return sanitizeMenuData(JSON.parse(stored));
                 }
@@ -1145,7 +1249,7 @@
 
         function loadFoodCards() {
             try {
-                const storedCards = localStorage.getItem('white_horse_food_cards');
+                const storedCards = safeStorageGet('white_horse_food_cards');
                 if (storedCards) {
                     const parsed = JSON.parse(storedCards);
                     if (Array.isArray(parsed)) {
@@ -1155,7 +1259,7 @@
             } catch (e) {
                 console.error('Error loading food cards:', e);
             }
-            localStorage.setItem('white_horse_food_cards', JSON.stringify(defaultFoodCards));
+            safeStorageSet('white_horse_food_cards', JSON.stringify(defaultFoodCards));
             return JSON.parse(JSON.stringify(defaultFoodCards));
         }
 
@@ -1185,7 +1289,6 @@
                         wifiPassword: wifiPassword,
                         updatedAt: new Date().toISOString()
                     }, { merge: true });
-                    console.log("Successfully written payload to Cloud Firestore.");
                     writtenToAny = true;
                     setDiagStatus('diag-firestore-status', 'Write Succeeded', 'text-emerald-600');
                 } catch (fsErr) {
@@ -1195,14 +1298,13 @@
                 }
             }
 
-            // 2. Write to Realtime DB
+            // 2. Write to Realtime DB (Never overwrite white_horse_wifi_leads node so mobile sign-ups are preserved)
             if (realtimeDb) {
                 try {
                     await realtimeDb.ref('white_horse_menu_data').set(menuData);
                     await realtimeDb.ref('white_horse_food_cards').set(foodCards);
                     await realtimeDb.ref('white_horse_events').set(eventsData);
                     await realtimeDb.ref('white_horse_wifi_password').set(wifiPassword);
-                    console.log("Successfully written payload to Realtime DB.");
                     writtenToAny = true;
                     setDiagStatus('diag-rtdb-status', 'Write Succeeded', 'text-emerald-600');
                 } catch (rtdbErr) {
@@ -1213,11 +1315,11 @@
             }
 
             // Also guarantee local storage sync
-            localStorage.setItem('white_horse_menu_data', JSON.stringify(menuData));
-            localStorage.setItem('white_horse_food_cards', JSON.stringify(foodCards));
-            localStorage.setItem('white_horse_events', JSON.stringify(eventsData));
-            localStorage.setItem('white_horse_wifi_password', wifiPassword);
-            localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+            safeStorageSet('white_horse_menu_data', JSON.stringify(menuData));
+            safeStorageSet('white_horse_food_cards', JSON.stringify(foodCards));
+            safeStorageSet('white_horse_events', JSON.stringify(eventsData));
+            safeStorageSet('white_horse_wifi_password', wifiPassword);
+            safeStorageSet('white_horse_wifi_leads', JSON.stringify(wifiLeads));
 
             if (writtenToAny) {
                 updateSyncStatus('connected', 'Live Cloud Sync');
@@ -1318,76 +1420,93 @@
             });
         }
 
-        function saveWifiPasswordSetting(e) {
+        function updateWifiPasswordFromAdmin(e) {
             e.preventDefault();
             const input = document.getElementById('admin-wifi-password-input');
             if (!input) return;
             const newPw = input.value.trim();
             if (!newPw) return;
             wifiPassword = newPw;
-            localStorage.setItem('white_horse_wifi_password', wifiPassword);
+            safeStorageSet('white_horse_wifi_password', wifiPassword);
             saveMenuData();
             renderAdminEditor();
         }
 
-        async function deleteWifiLead(index) {
-            const lead = wifiLeads[index];
+        function deleteWifiLead(leadId) {
+            const lead = wifiLeads.find(l => l.id === leadId);
             if (!lead) return;
-            if (confirm(`Remove "${lead.name}" (${lead.email}) from the list?`)) {
-                const leadId = lead.id;
-                wifiLeads.splice(index, 1);
-                localStorage.setItem('white_horse_wifi_leads', JSON.stringify(wifiLeads));
 
-                if (firestoreDb && leadId) {
-                    try {
-                        await firestoreDb.collection('wifi_leads').doc(leadId).delete();
-                    } catch (e) {
-                        console.warn('Firestore wifi_leads delete warning:', e);
+            openDeleteConfirmModal(
+                `Are you sure you want to remove "${lead.name || 'this guest'}" (${lead.email || ''}) from the Wi-Fi & marketing list?`,
+                async () => {
+                    deletedLeadIds.add(leadId);
+                    const rtdbKey = lead.rtdbKey;
+
+                    wifiLeads = wifiLeads.filter(l => l.id !== leadId);
+                    safeStorageSet('white_horse_wifi_leads', JSON.stringify(wifiLeads));
+                    renderAdminEditor();
+
+                    // Remove from Firestore wifi_leads collection and portal document
+                    if (firestoreDb) {
+                        try {
+                            await firestoreDb.collection('wifi_leads').doc(leadId).delete();
+                        } catch (e) {
+                            console.warn('Firestore wifi_leads doc delete warning:', e);
+                        }
+                        try {
+                            await firestoreDb.collection('white_horse_portal').doc('data').set({
+                                wifiLeads: wifiLeads,
+                                updatedAt: new Date().toISOString()
+                            }, { merge: true });
+                        } catch (e) {
+                            console.warn('Firestore portal data wifiLeads update warning:', e);
+                        }
+                    }
+
+                    // Remove from Realtime Database (by ID and by push key if different)
+                    if (realtimeDb) {
+                        try {
+                            await realtimeDb.ref('white_horse_wifi_leads/' + leadId).remove();
+                            if (rtdbKey && rtdbKey !== leadId) {
+                                await realtimeDb.ref('white_horse_wifi_leads/' + rtdbKey).remove();
+                            }
+                        } catch (e) {
+                            console.warn('Realtime DB wifi_leads delete warning:', e);
+                        }
                     }
                 }
-                if (realtimeDb && leadId) {
-                    try {
-                        await realtimeDb.ref('white_horse_wifi_leads/' + leadId).remove();
-                        await realtimeDb.ref('wifi_leads/' + leadId).remove();
-                    } catch (e) {
-                        console.warn('Realtime DB wifi_leads delete warning:', e);
-                    }
-                }
-
-                saveMenuData();
-                renderAdminEditor();
-            }
+            );
         }
 
-        function exportWifiLeadsCSV() {
+        function downloadWifiLeadsCSV() {
             if (!wifiLeads || wifiLeads.length === 0) {
                 const toastError = document.getElementById('admin-error-toast');
                 const toastErrorMsg = document.getElementById('admin-error-msg');
                 if (toastError && toastErrorMsg) {
-                    toastErrorMsg.textContent = 'There are no guest Wi-Fi sign-ups to export yet.';
+                    toastErrorMsg.textContent = 'There are no guest Wi-Fi sign-ups to download yet.';
                     toastError.classList.remove('hidden');
                     setTimeout(() => toastError.classList.add('hidden'), 3000);
                 }
                 return;
             }
 
-            const headers = ['Name', 'Email', 'Marketing Opt-In', 'Date & Time'];
+            const headers = ['Name', 'Email', 'Keep Me Up To Date', 'Date & Time'];
             const rows = wifiLeads.map(lead => {
-                const safeName = `"${(lead.name || '').replace(/"/g, '""')}"`;
-                const safeEmail = `"${(lead.email || '').replace(/"/g, '""')}"`;
-                const optIn = lead.marketingOptIn ? 'Yes' : 'No';
-                const dateStr = lead.submittedAt ? new Date(lead.submittedAt).toLocaleString('en-GB') : '';
-                const safeDate = `"${dateStr.replace(/"/g, '""')}"`;
-                return [safeName, safeEmail, optIn, safeDate].join(',');
+                const name = `"${(lead.name || '').replace(/"/g, '""')}"`;
+                const email = `"${(lead.email || '').replace(/"/g, '""')}"`;
+                const optedIn = (lead.marketingOptIn ?? lead.acceptsMarketing ?? lead.marketingAccepted) ? 'Yes' : 'No';
+                const ts = lead.submittedAt || lead.createdAt || '';
+                const dateFormatted = ts ? new Date(ts).toLocaleString('en-GB') : '';
+                return [name, email, `"${optedIn}"`, `"${dateFormatted}"`].join(',');
             });
 
             const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const dateStamp = getTodayDateString();
-            link.href = url;
-            link.setAttribute('download', `white-horse-wifi-marketing-leads-${dateStamp}.csv`);
+            const todayStr = getTodayDateString();
+            link.setAttribute('href', url);
+            link.setAttribute('download', `white-horse-wifi-marketing-leads-${todayStr}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -1397,56 +1516,53 @@
         function renderWifiAdminEditor(container) {
             container.innerHTML = '';
 
-            // 1. Wi-Fi Password Settings Card
-            const settingsCard = document.createElement('div');
-            settingsCard.className = 'glass-card rounded-3xl p-5 sm:p-6 border border-white/90 space-y-4';
-            settingsCard.innerHTML = `
+            // Section 1: Wi-Fi Password Management Card
+            const pwCard = document.createElement('div');
+            pwCard.className = 'glass-card rounded-3xl p-5 sm:p-6 border border-white/90 space-y-4';
+            pwCard.innerHTML = `
                 <div class="flex items-center justify-between border-b border-emerald-900/10 pb-3">
                     <div>
-                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage">Guest Wi-Fi Password Configuration</h3>
-                        <p class="text-xs text-gray-600">Update the password revealed to guests after they submit their name and email on the homepage.</p>
+                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage"><i class="fas fa-key mr-1.5"></i> Guest Wi-Fi Password Settings</h3>
+                        <p class="text-xs text-gray-600">Update the Wi-Fi password displayed to guests on the main website after they submit their details.</p>
                     </div>
-                    <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-bold">
-                        <i class="fas fa-wifi mr-1"></i> Active
-                    </span>
                 </div>
-                <form onsubmit="saveWifiPasswordSetting(event)" class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                <form onsubmit="updateWifiPasswordFromAdmin(event)" class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                     <div class="flex-1">
-                        <label for="admin-wifi-password-input" class="block text-xs font-bold text-pub-deep mb-1">Current Guest Wi-Fi Password</label>
-                        <input type="text" id="admin-wifi-password-input" required value="${wifiPassword.replace(/"/g, '&quot;')}" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-mono font-bold text-pub-deep">
+                        <label for="admin-wifi-password-input" class="block text-xs font-bold text-pub-deep mb-1">Current Active Wi-Fi Password *</label>
+                        <input type="text" id="admin-wifi-password-input" value="${wifiPassword.replace(/"/g, '&quot;')}" required class="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-mono font-bold text-pub-deep">
                     </div>
-                    <button type="submit" class="glass-button-primary text-white text-xs font-bold px-5 py-3 rounded-xl uppercase tracking-wider cursor-pointer shrink-0">
-                        <i class="fas fa-save mr-1.5"></i> Update Wi-Fi Password
+                    <button type="submit" class="glass-button-primary text-white text-xs font-bold px-5 py-3 rounded-xl uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-1.5">
+                        <i class="fas fa-save"></i> Save Wi-Fi Password
                     </button>
                 </form>
             `;
-            container.appendChild(settingsCard);
+            container.appendChild(pwCard);
 
-            // 2. Guest Wi-Fi & Marketing Sign-ups Table Card
+            // Section 2: Wi-Fi Guest & Marketing Opt-In Spreadsheet List
             const leadsCard = document.createElement('div');
             leadsCard.className = 'glass-card rounded-3xl p-5 sm:p-6 border border-white/90 space-y-4';
 
-            const optedInCount = wifiLeads.filter(l => l.marketingOptIn).length;
+            const optedInCount = wifiLeads.filter(l => Boolean(l.marketingOptIn ?? l.acceptsMarketing ?? l.marketingAccepted)).length;
 
-            let rowsHtml = wifiLeads.map((lead, idx) => {
-                const formattedDate = lead.submittedAt
-                    ? new Date(lead.submittedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                    : 'N/A';
-
-                const consentBadge = lead.marketingOptIn
-                    ? '<span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-check-circle text-emerald-600"></i> Accepted</span>'
-                    : '<span class="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-times-circle text-gray-400"></i> Declined</span>';
+            let rowsHtml = wifiLeads.map(lead => {
+                const ts = lead.submittedAt || lead.createdAt || '';
+                const dateDisplay = ts
+                    ? new Date(ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '—';
+                const optedIn = Boolean(lead.marketingOptIn ?? lead.acceptsMarketing ?? lead.marketingAccepted);
+                const marketingBadge = optedIn
+                    ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-check-circle"></i> Yes</span>'
+                    : '<span class="px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] font-bold inline-flex items-center gap-1"><i class="fas fa-times-circle"></i> No</span>';
+                const safeId = String(lead.id || '').replace(/'/g, "\\'");
 
                 return `
-                    <tr class="border-b border-emerald-900/10 hover:bg-white/60 transition">
-                        <td class="py-3 px-4 font-bold text-pub-deep text-xs sm:text-sm">${lead.name || ''}</td>
-                        <td class="py-3 px-4 text-xs sm:text-sm text-gray-700">
-                            <a href="mailto:${lead.email || ''}" class="text-pub-sage hover:underline font-medium">${lead.email || ''}</a>
-                        </td>
-                        <td class="py-3 px-4">${consentBadge}</td>
-                        <td class="py-3 px-4 text-xs text-gray-500 whitespace-nowrap">${formattedDate}</td>
+                    <tr class="border-b border-emerald-900/10 hover:bg-white/70 transition">
+                        <td class="py-3 px-4 font-bold text-pub-deep text-xs sm:text-sm">${lead.name || '—'}</td>
+                        <td class="py-3 px-4 text-xs sm:text-sm text-gray-700">${lead.email || '—'}</td>
+                        <td class="py-3 px-4">${marketingBadge}</td>
+                        <td class="py-3 px-4 text-xs text-gray-500 whitespace-nowrap">${dateDisplay}</td>
                         <td class="py-3 px-4 text-right">
-                            <button type="button" onclick="deleteWifiLead(${idx})" class="glass-pill hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer" title="Delete Entry">
+                            <button type="button" onclick="deleteWifiLead('${safeId}')" class="glass-pill hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer" title="Remove Entry">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </td>
@@ -1455,29 +1571,29 @@
             }).join('');
 
             leadsCard.innerHTML = `
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-900/10 pb-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-emerald-900/10 pb-3 gap-3">
                     <div>
-                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage">Guest Wi-Fi &amp; Marketing Contacts</h3>
-                        <p class="text-xs text-gray-600">Total entries: <strong>${wifiLeads.length}</strong> • Marketing opted-in: <strong class="text-emerald-700">${optedInCount}</strong></p>
+                        <h3 class="font-serif font-bold text-pub-deep text-lg text-pub-sage"><i class="fas fa-users mr-1.5"></i> Guest Wi-Fi Sign-Ups &amp; Marketing List</h3>
+                        <p class="text-xs text-gray-600">Total entries: <strong>${wifiLeads.length}</strong> • Keep me up to date: <strong class="text-emerald-700">${optedInCount}</strong></p>
                     </div>
-                    <button type="button" onclick="exportWifiLeadsCSV()" class="glass-button-primary text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider shadow-md shrink-0">
+                    <button type="button" onclick="downloadWifiLeadsCSV()" class="glass-button-primary text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider shadow-md">
                         <i class="fas fa-file-csv text-sm"></i> Download Spreadsheet (.CSV)
                     </button>
                 </div>
 
-                <div class="overflow-x-auto rounded-2xl border border-emerald-900/10 bg-white/70">
+                <div class="overflow-x-auto rounded-2xl border border-emerald-900/10 bg-white/80">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-pub-light/90 border-b border-emerald-900/10 text-[11px] font-bold uppercase tracking-wider text-pub-deep">
                                 <th class="py-3 px-4">Guest Name</th>
                                 <th class="py-3 px-4">Email Address</th>
-                                <th class="py-3 px-4">Marketing Consent</th>
+                                <th class="py-3 px-4">Keep Me Up To Date</th>
                                 <th class="py-3 px-4">Date &amp; Time</th>
-                                <th class="py-3 px-4 text-right">Action</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${rowsHtml || '<tr><td colspan="5" class="py-8 text-center text-xs text-gray-500">No guests have requested the Wi-Fi password yet. Entries will appear here automatically.</td></tr>'}
+                            ${rowsHtml || '<tr><td colspan="5" class="py-8 text-center text-xs text-gray-500">No guest Wi-Fi submissions recorded yet.</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -1684,11 +1800,11 @@
         function deleteEvent(eventId) {
             const evt = eventsData.find(e => e.id === eventId);
             if (!evt) return;
-            if (confirm(`Are you sure you want to delete event "${evt.title}"?`)) {
+            openDeleteConfirmModal(`Are you sure you want to delete event "${evt.title}"?`, () => {
                 eventsData = eventsData.filter(e => e.id !== eventId);
                 saveMenuData();
                 renderAdminEditor();
-            }
+            });
         }
 
         function openAddCardModal() {
@@ -1737,11 +1853,11 @@
         function deleteFoodCard(cardIdx) {
             const c = foodCards[cardIdx];
             if (!c) return;
-            if (confirm(`Are you sure you want to delete card "${c.title}"?`)) {
+            openDeleteConfirmModal(`Are you sure you want to delete card "${c.title}"?`, () => {
                 foodCards.splice(cardIdx, 1);
                 saveMenuData();
                 renderAdminEditor();
-            }
+            });
         }
 
         function openEditDishModal(menuKey, secIdx, itemIdx) {
@@ -1804,35 +1920,14 @@
             const item = menuData[menuKey]?.sections[secIdx]?.items[itemIdx];
             if (!item) return;
 
-            if (confirm(`Are you sure you want to delete "${item.name}" from the menu?`)) {
+            openDeleteConfirmModal(`Are you sure you want to delete "${item.name}" from the menu?`, () => {
                 menuData[menuKey].sections[secIdx].items.splice(itemIdx, 1);
                 saveMenuData();
                 renderAdminEditor();
-            }
+            });
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-            // PIN Form Submit
-            const pinForm = document.getElementById('admin-pin-form');
-            if (pinForm) {
-                pinForm.addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const pinInput = document.getElementById('admin-pin-input');
-                    const pinError = document.getElementById('admin-pin-error');
-                    const authScreen = document.getElementById('admin-auth-screen');
-                    const dashScreen = document.getElementById('admin-dashboard-screen');
-
-                    if (pinInput && pinInput.value.trim() === '1982') {
-                        pinError?.classList.add('hidden');
-                        authScreen?.classList.add('hidden');
-                        dashScreen?.classList.remove('hidden');
-                        switchAdminMenuTab('main');
-                    } else {
-                        pinError?.classList.remove('hidden');
-                    }
-                });
-            }
-
+        function initAdminPortal() {
             // Card Editor Form Submit
             const cardForm = document.getElementById('card-editor-form');
             if (cardForm) {
@@ -1945,7 +2040,13 @@
                     }
                 });
             }
-        });
+        }
+
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', initAdminPortal);
+        } else {
+            initAdminPortal();
+        }
     </script>
 </body>
 </html>
